@@ -1,0 +1,9 @@
+--- ini.c	2018-05-25 10:22:08.793348588 +0900
++++ ini2.c	2018-05-25 11:55:32.937069349 +0900
+@@ -1,4 +1,5 @@
+-main(int argc, char ** argv) {
++#include <stdio.h>
++int main(int argc, char ** argv) {
+     char * gn = argv[1];
+     char * fn = argv[2];
+     char g = gn[0];

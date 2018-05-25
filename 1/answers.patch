@@ -1,0 +1,158 @@
+diff -ur old/answers/00/p00.c new/answers/00/p00.c
+--- old/answers/00/p00.c	2013-04-15 23:03:33.000000000 +0900
++++ new/answers/00/p00.c	2018-05-25 12:21:06.176920487 +0900
+@@ -11,6 +11,7 @@
+  * It should print the content of this file.
+  *
+  */
++#include <stdio.h>
+ 
+ int main()
+ {
+diff -ur old/answers/01/p01.c new/answers/01/p01.c
+--- old/answers/01/p01.c	2013-04-15 23:09:57.000000000 +0900
++++ new/answers/01/p01.c	2018-05-25 12:21:06.176920487 +0900
+@@ -16,16 +16,7 @@
+  */
+ 
+ #include <stdio.h>
+-
+-int main()
+-{
+-  int i;
+-  for (i = 0; i < 100; i++) {
+-    double y = cos2(i) + sin2(i);
+-    printf("cos^2(%d)+sin^2(%d) = %f\n", i, i, y);
+-  }
+-  return 0;
+-}
++#include <math.h>
+ 
+ double cos2(double x) 
+ {
+@@ -38,3 +29,13 @@
+   double s = sin(x);
+   return s * s;
+ }
++
++int main()
++{
++  int i;
++  for (i = 0; i < 100; i++) {
++    double y = cos2(i) + sin2(i);
++    printf("cos^2(%d)+sin^2(%d) = %f\n", i, i, y);
++  }
++  return 0;
++}
+diff -ur old/answers/02/p02.c new/answers/02/p02.c
+--- old/answers/02/p02.c	2013-04-15 23:09:28.000000000 +0900
++++ new/answers/02/p02.c	2018-05-25 12:21:06.176920487 +0900
+@@ -17,6 +17,8 @@
+  *    ./a.out a b
+  *    0.000000
+  */
++#include <stdlib.h>
++#include <stdio.h>
+ 
+ int main(int argc, char ** argv)
+ {
+diff -ur old/answers/03/p03.c new/answers/03/p03.c
+--- old/answers/03/p03.c	2013-04-15 23:14:19.000000000 +0900
++++ new/answers/03/p03.c	2018-05-25 12:21:06.176920487 +0900
+@@ -41,7 +41,7 @@
+ 
+ vect3 * mk_point(double x, double y, double z)
+ {
+-  vect3 * p;
++  vect3 * p = (vect3*) malloc(sizeof(vect3));
+   p->x = x;
+   p->y = y;
+   p->z = z;
+diff -ur old/answers/04/p04.c new/answers/04/p04.c
+--- old/answers/04/p04.c	2013-04-15 23:13:07.000000000 +0900
++++ new/answers/04/p04.c	2018-05-25 12:21:06.176920487 +0900
+@@ -41,7 +41,7 @@
+ 
+ vect3 * mk_point(double x, double y, double z)
+ {
+-  vect3 p[1];
++  vect3 *p = (vect3*) malloc(sizeof(vect3));
+   p->x = x;
+   p->y = y;
+   p->z = z;
+diff -ur old/answers/05/p05.c new/answers/05/p05.c
+--- old/answers/05/p05.c	2013-04-15 23:23:56.000000000 +0900
++++ new/answers/05/p05.c	2018-05-25 12:21:06.176920487 +0900
+@@ -14,7 +14,7 @@
+ #include <stdio.h>
+ int main()
+ {
+-  FILE * fp = fopen("pO5.c", "rb");
++  FILE * fp = fopen("p05.c", "rb");
+   char buf[100];
+   while (1) {
+     int n = fread(buf, 1, 100, fp);
+diff -ur old/answers/06/p06.c new/answers/06/p06.c
+--- old/answers/06/p06.c	2013-04-15 23:22:24.000000000 +0900
++++ new/answers/06/p06.c	2018-05-25 12:21:06.176920487 +0900
+@@ -12,9 +12,12 @@
+  *
+  */
+ 
++#include <fcntl.h>
++#include <unistd.h>
++
+ int main()
+ {
+-  int fd = open("pO6.c", O_RDONLY);
++  int fd = open("p06.c", O_RDONLY);
+   char buf[100];
+   while (1) {
+     int n = read(fd, buf, 100);
+diff -ur old/answers/07/p07.c new/answers/07/p07.c
+--- old/answers/07/p07.c	2013-04-15 23:58:57.000000000 +0900
++++ new/answers/07/p07.c	2018-05-25 12:21:06.176920487 +0900
+@@ -44,6 +44,7 @@
+     assert(t);
+     bcopy(s, t, end);
+     free(s);
++    s = t;
+   }
+   /* print s from end to beginning */
+   int i;
+diff -ur old/answers/08/p08.c new/answers/08/p08.c
+--- old/answers/08/p08.c	2013-04-16 12:37:01.000000000 +0900
++++ new/answers/08/p08.c	2018-05-25 12:21:06.176920487 +0900
+@@ -85,6 +85,8 @@
+ 
+  */
+ 
++void syntax_error() __attribute__ ((noreturn));
++
+ void syntax_error()
+ {
+   fprintf(stderr, "syntax error:\n");
+@@ -146,8 +148,10 @@
+     return number();
+   }
+   case '(': {
++    p++;
+     double x = E_expression();
+     if (*p == ')') {
++      p++;
+       return x;
+     } else {
+       syntax_error();
+@@ -221,10 +225,10 @@
+   while (1) {
+     if (*p == '+') {
+       p++;
+-      x =+ F_expression();
++      x += F_expression();
+     } else if (*p == '-') {
+       p++;
+-      x =- F_expression();
++      x -= F_expression();
+     } else {
+       return x;
+     }
