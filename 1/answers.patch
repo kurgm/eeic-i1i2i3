@@ -1,7 +1,7 @@
-diff -ur old/answers/00/p00.c new/answers/00/p00.c
+diff -u -p -r problems/00/p00.c answers/00/p00.c
 --- old/answers/00/p00.c	2013-04-15 23:03:33.000000000 +0900
-+++ new/answers/00/p00.c	2018-05-25 12:21:06.176920487 +0900
-@@ -11,6 +11,7 @@
++++ new/answers/00/p00.c	2018-05-29 15:00:19.000000000 +0900
+@@ -11,14 +11,17 @@
   * It should print the content of this file.
   *
   */
@@ -9,9 +9,19 @@ diff -ur old/answers/00/p00.c new/answers/00/p00.c
  
  int main()
  {
-diff -ur old/answers/01/p01.c new/answers/01/p01.c
+   FILE * fp = fopen("p00.c", "rb");
++  if (fp == NULL) { perror("open failed"); return 1; }
+   while (1) {
+     int c = fgetc(fp);
+     if (c == EOF) break;
+     fputc(c, stdout);
+   }
++  fclose(fp);
+   return 0;
+ }
+diff -u -p -r problems/01/p01.c answers/01/p01.c
 --- old/answers/01/p01.c	2013-04-15 23:09:57.000000000 +0900
-+++ new/answers/01/p01.c	2018-05-25 12:21:06.176920487 +0900
++++ new/answers/01/p01.c	2018-05-29 14:44:30.000000000 +0900
 @@ -16,16 +16,7 @@
   */
  
@@ -30,7 +40,7 @@ diff -ur old/answers/01/p01.c new/answers/01/p01.c
  
  double cos2(double x) 
  {
-@@ -38,3 +29,13 @@
+@@ -38,3 +29,13 @@ double sin2(double x) 
    double s = sin(x);
    return s * s;
  }
@@ -44,9 +54,9 @@ diff -ur old/answers/01/p01.c new/answers/01/p01.c
 +  }
 +  return 0;
 +}
-diff -ur old/answers/02/p02.c new/answers/02/p02.c
+diff -u -p -r problems/02/p02.c answers/02/p02.c
 --- old/answers/02/p02.c	2013-04-15 23:09:28.000000000 +0900
-+++ new/answers/02/p02.c	2018-05-25 12:21:06.176920487 +0900
++++ new/answers/02/p02.c	2018-05-29 14:44:30.000000000 +0900
 @@ -17,6 +17,8 @@
   *    ./a.out a b
   *    0.000000
@@ -56,74 +66,121 @@ diff -ur old/answers/02/p02.c new/answers/02/p02.c
  
  int main(int argc, char ** argv)
  {
-diff -ur old/answers/03/p03.c new/answers/03/p03.c
+diff -u -p -r problems/03/p03.c answers/03/p03.c
 --- old/answers/03/p03.c	2013-04-15 23:14:19.000000000 +0900
-+++ new/answers/03/p03.c	2018-05-25 12:21:06.176920487 +0900
-@@ -41,7 +41,7 @@
++++ new/answers/03/p03.c	2018-05-29 14:45:08.000000000 +0900
+@@ -41,7 +41,7 @@ double angle(vect3 * A, vect3 * B)
  
  vect3 * mk_point(double x, double y, double z)
  {
 -  vect3 * p;
-+  vect3 * p = (vect3*) malloc(sizeof(vect3));
++  vect3 * p = (vect3 *) malloc(sizeof(vect3));
    p->x = x;
    p->y = y;
    p->z = z;
-diff -ur old/answers/04/p04.c new/answers/04/p04.c
+@@ -54,5 +54,7 @@ int main(int argc, char ** argv)
+   vect3 * B = mk_point(atof(argv[4]), atof(argv[5]), atof(argv[6]));
+   double a = angle(A, B);
+   printf("%f\n", a);
++  free(A);
++  free(B);
+   return 0;
+ }
+diff -u -p -r problems/04/p04.c answers/04/p04.c
 --- old/answers/04/p04.c	2013-04-15 23:13:07.000000000 +0900
-+++ new/answers/04/p04.c	2018-05-25 12:21:06.176920487 +0900
-@@ -41,7 +41,7 @@
++++ new/answers/04/p04.c	2018-05-29 14:45:15.000000000 +0900
+@@ -41,7 +41,7 @@ double angle(vect3 * A, vect3 * B)
  
  vect3 * mk_point(double x, double y, double z)
  {
 -  vect3 p[1];
-+  vect3 *p = (vect3*) malloc(sizeof(vect3));
++  vect3 *p = (vect3 *) malloc(sizeof(vect3));
    p->x = x;
    p->y = y;
    p->z = z;
-diff -ur old/answers/05/p05.c new/answers/05/p05.c
+@@ -54,5 +54,7 @@ int main(int argc, char ** argv)
+   vect3 * B = mk_point(atof(argv[4]), atof(argv[5]), atof(argv[6]));
+   double a = angle(A, B);
+   printf("%f\n", a);
++  free(A);
++  free(B);
+   return 0;
+ }
+diff -u -p -r problems/05/p05.c answers/05/p05.c
 --- old/answers/05/p05.c	2013-04-15 23:23:56.000000000 +0900
-+++ new/answers/05/p05.c	2018-05-25 12:21:06.176920487 +0900
-@@ -14,7 +14,7 @@
++++ new/answers/05/p05.c	2018-05-29 15:00:35.000000000 +0900
+@@ -14,13 +14,15 @@
  #include <stdio.h>
  int main()
  {
 -  FILE * fp = fopen("pO5.c", "rb");
 +  FILE * fp = fopen("p05.c", "rb");
++  if (fp == NULL) { perror("open failed"); return 1; }
    char buf[100];
    while (1) {
      int n = fread(buf, 1, 100, fp);
-diff -ur old/answers/06/p06.c new/answers/06/p06.c
+     if (n == 0) break;
+     fwrite(buf, 1, n, stdout);
+   }
++  fclose(fp);
+   return 0;
+ }
+ 
+diff -u -p -r problems/06/p06.c answers/06/p06.c
 --- old/answers/06/p06.c	2013-04-15 23:22:24.000000000 +0900
-+++ new/answers/06/p06.c	2018-05-25 12:21:06.176920487 +0900
-@@ -12,9 +12,12 @@
++++ new/answers/06/p06.c	2018-05-29 15:01:56.000000000 +0900
+@@ -12,14 +12,20 @@
   *
   */
  
 +#include <fcntl.h>
++#include <stdio.h>
 +#include <unistd.h>
 +
  int main()
  {
 -  int fd = open("pO6.c", O_RDONLY);
 +  int fd = open("p06.c", O_RDONLY);
++  if (fd == -1) { perror("open failed"); return 1; }
    char buf[100];
    while (1) {
      int n = read(fd, buf, 100);
-diff -ur old/answers/07/p07.c new/answers/07/p07.c
+     if (n == 0) break;
+     write(1, buf, n);
+   }
++  close(fd);
+   return 0;
+ }
+diff -u -p -r problems/07/p07.c answers/07/p07.c
 --- old/answers/07/p07.c	2013-04-15 23:58:57.000000000 +0900
-+++ new/answers/07/p07.c	2018-05-25 12:21:06.176920487 +0900
-@@ -44,6 +44,7 @@
++++ new/answers/07/p07.c	2018-05-29 15:02:54.000000000 +0900
+@@ -24,6 +24,7 @@ int main(int argc, char ** argv)
+   /* try to read the whole contents of 
+      the file into s */
+   FILE * fp = fopen(argv[1], "rb");
++  if (fp == NULL) { perror("open failed"); return 1; }
+   /* s is initially small (10 bytes) */
+   int begin = 0;
+   int end = 10;
+@@ -44,11 +45,14 @@ int main(int argc, char ** argv)
      assert(t);
      bcopy(s, t, end);
      free(s);
 +    s = t;
    }
++  fclose(fp);
    /* print s from end to beginning */
    int i;
-diff -ur old/answers/08/p08.c new/answers/08/p08.c
+   for (i = end - 1; i >= 0; i--) {
+     putchar(s[i]);
+   }
++  free(s);
+   return 0;
+ }
+diff -u -p -r problems/08/p08.c answers/08/p08.c
 --- old/answers/08/p08.c	2013-04-16 12:37:01.000000000 +0900
-+++ new/answers/08/p08.c	2018-05-25 12:21:06.176920487 +0900
-@@ -85,6 +85,8 @@
++++ new/answers/08/p08.c	2018-05-29 14:44:30.000000000 +0900
+@@ -85,6 +85,8 @@ line: |2|3|+|3|*|6|7|-|(|3|+|4|)| | | |
  
   */
  
@@ -132,7 +189,7 @@ diff -ur old/answers/08/p08.c new/answers/08/p08.c
  void syntax_error()
  {
    fprintf(stderr, "syntax error:\n");
-@@ -146,8 +148,10 @@
+@@ -146,8 +148,10 @@ double H_expression() 
      return number();
    }
    case '(': {
@@ -143,7 +200,7 @@ diff -ur old/answers/08/p08.c new/answers/08/p08.c
        return x;
      } else {
        syntax_error();
-@@ -221,10 +225,10 @@
+@@ -221,10 +225,10 @@ double E_expression() 
    while (1) {
      if (*p == '+') {
        p++;
