@@ -7,8 +7,9 @@
 
 #define N 256
 
+static unsigned char data[N];
+
 int main(int argc, char **argv) {
-    unsigned char data[N];
     for (int i = 0; i < N; i++) {
         data[i] = (unsigned char)i;
     }

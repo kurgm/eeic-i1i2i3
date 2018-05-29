@@ -14,14 +14,13 @@ static int A, n;
 short func(double f, double t);
 void write_force(int fildes, const void *ptr, size_t nbyte);
 
-short func(double f, double t) {
-    return (short)(A * sin(2 * M_PI * f * t));
-}
+short func(double f, double t) { return (short)(A * sin(2 * M_PI * f * t)); }
 
 void write_force(int fildes, const void *ptr, size_t nbyte) {
     size_t written = 0;
-     while (written < nbyte) {
-        ssize_t written2 = write(fildes, (const char *)ptr + written, nbyte - written);
+    while (written < nbyte) {
+        ssize_t written2 =
+            write(fildes, (const char *)ptr + written, nbyte - written);
         if (written2 == -1) {
             perror("write failed");
             exit(1);

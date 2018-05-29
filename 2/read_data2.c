@@ -27,7 +27,7 @@ int main(int argc, char **argv) {
     short data[N];
     size_t rem = 0;
     while (1) {
-        ssize_t nread = read(fd, (char *)data + rem, N * sizeof(short) - rem);
+        ssize_t nread = read(fd, (char *)data + rem, sizeof(data) - rem);
         if (nread == -1) {
             perror("read");
             exit(1);
@@ -41,7 +41,7 @@ int main(int argc, char **argv) {
         }
         rem = nbyte % sizeof(short);
         if (rem != 0) {
-            memmove(data, (char *)data + nbyte - rem, rem);
+            memmove(data, data + nbyte / sizeof(short), rem);
         }
     }
     close(fd);
