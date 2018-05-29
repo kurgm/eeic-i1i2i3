@@ -1,4 +1,4 @@
-CFLAGS=-Weverything
+CFLAGS=-Wall
 LDLIBS=-lm
 
 TARGETS = downsample bandpass voice_filter
