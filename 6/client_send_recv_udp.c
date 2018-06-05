@@ -27,6 +27,20 @@ int write_force(int fildes, const void *ptr, size_t nbyte) {
     return 0;
 }
 
+int send_force(int socket, const void *buffer, size_t length, int flags) {
+    size_t sent = 0;
+    while (sent < length) {
+        ssize_t sent2 =
+            send(socket, (const char *)buffer + sent, length - sent, flags);
+        if (sent2 == -1) {
+            perror("send failed");
+            return 1;
+        }
+        sent += (size_t)sent2;
+    }
+    return 0;
+}
+
 int main(int argc, char **argv) {
     if (argc != 3) {
         fprintf(stderr, "usage: %s IPADDRESS PORT\n", argv[0]);
@@ -49,8 +63,23 @@ int main(int argc, char **argv) {
         return 2;
     }
     data[0] = 42;
-    if (send(s, data, 1, 0) == -1) {
-        perror("send failed");
+    while (1) {
+        ssize_t n = read(0, data, sizeof(data));
+        if (n == 0) {
+            break;
+        }
+        if (n == -1) {
+            perror("read failed");
+            return 1;
+        }
+        if (send_force(s, data, sizeof(char) * (size_t)n, 0)) {
+            return 1;
+        }
+    }
+    for (size_t i = 0; i < N; i++) {
+        data[i] = 1;
+    }
+    if (send_force(s, data, sizeof(data), 0)) {
         return 1;
     }
     while (1) {

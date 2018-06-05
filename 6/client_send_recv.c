@@ -12,6 +12,7 @@
 
 static char data[N];
 int write_force(int fildes, const void *ptr, size_t nbyte);
+int send_force(int socket, const void *buffer, size_t length, int flags);
 
 int write_force(int fildes, const void *ptr, size_t nbyte) {
     size_t written = 0;
@@ -23,6 +24,20 @@ int write_force(int fildes, const void *ptr, size_t nbyte) {
             return 1;
         }
         written += (size_t)written2;
+    }
+    return 0;
+}
+
+int send_force(int socket, const void *buffer, size_t length, int flags) {
+    size_t sent = 0;
+    while (sent < length) {
+        ssize_t sent2 =
+            send(socket, (const char *)buffer + sent, length - sent, flags);
+        if (sent2 == -1) {
+            perror("send failed");
+            return 1;
+        }
+        sent += (size_t)sent2;
     }
     return 0;
 }
@@ -50,6 +65,22 @@ int main(int argc, char **argv) {
     }
     int failed = 0;
     while (!failed) {
+        ssize_t n = read(0, data, sizeof(data));
+        if (n == 0) {
+            break;
+        }
+        if (n == -1) {
+            perror("read failed");
+            failed = 1;
+            break;
+        }
+        failed = send_force(s, data, sizeof(char) * (size_t)n, 0);
+    }
+    if (shutdown(s, SHUT_WR) == -1) {
+        perror("shutdown");
+        return 2;
+    }
+    while (!failed) {
         ssize_t n = recv(s, data, sizeof(data), 0);
         if (n == 0) {
             break;
@@ -60,10 +91,6 @@ int main(int argc, char **argv) {
             break;
         }
         failed = write_force(1, data, sizeof(char) * (size_t)n);
-    }
-    if (shutdown(s, SHUT_WR) == -1) {
-        perror("shutdown");
-        return 2;
     }
     return failed;
 }
