@@ -12,6 +12,7 @@
 
 static char data[N];
 int write_force(int fildes, const void *ptr, size_t nbyte);
+int send_force(int socket, const void *buffer, size_t length, int flags);
 
 int write_force(int fildes, const void *ptr, size_t nbyte) {
     size_t written = 0;
