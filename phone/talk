@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+
+usage_exit() {
+  echo "usage: $0 [-p AUDIOPORT] [-q VIDEOPORT] {-l | ADDRESS}" 1>&2
+  exit 1
+}
+
+
+APORT=50000
+VPORT=50001
+ADDR=
+
+while getopts p:q:lh OPT; do
+  case $OPT in
+    p)
+      APORT=$OPTARG
+    ;;
+    q)
+      VPORT=$OPTARG
+    ;;
+    l)
+      ADDR=-l
+    ;;
+    h | \?)
+      usage_exit
+    ;;
+  esac
+done
+
+shift $((OPTIND - 1))
+
+if [ ! \( $# -eq 0 -a "$ADDR" = -l -o $# -eq 1 -a -z "$ADDR" \) ]; then
+  usage_exit
+fi
+
+if [ ! -p video1 ]; then
+  mkfifo video1
+fi
+if [ ! -p video2 ]; then
+  mkfifo video2
+fi
+
+gnome-terminal --zoom=0.4 --geometry=160x60+0+0 -- cat video1
+gnome-terminal --zoom=0.4 --geometry=160x60+1000+0 -- cat video2
+
+rec -t raw -b 16 -e s -c 1 -r 44100 - 2> /dev/null \
+| ./tvphone $1 50000 50001 video1 video2 \
+| play -t raw -b 16 -e s -c 1 -r 44100 - 2> /dev/null
+
+rm video1 video2
