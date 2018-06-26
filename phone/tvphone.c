@@ -1,6 +1,6 @@
 #include <arpa/inet.h>
+#include <assert.h>
 #include <errno.h>
-#include <linux/videodev2.h>
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -15,41 +15,13 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "forceio.h"
+#include "videotalk.h"
+
 #define N 256
 
 static char data[N];
-int write_force(int fildes, const void *ptr, size_t nbyte);
-int send_force(int socket, const void *buffer, size_t length, int flags);
 void *stdinreader(void *arg);
-void *videotalk(const void *arg);
-
-int write_force(int fildes, const void *ptr, size_t nbyte) {
-    size_t written = 0;
-    while (written < nbyte) {
-        ssize_t written2 =
-            write(fildes, (const char *)ptr + written, nbyte - written);
-        if (written2 == -1) {
-            perror("write failed");
-            return 1;
-        }
-        written += (size_t)written2;
-    }
-    return 0;
-}
-
-int send_force(int socket, const void *buffer, size_t length, int flags) {
-    size_t sent = 0;
-    while (sent < length) {
-        ssize_t sent2 =
-            send(socket, (const char *)buffer + sent, length - sent, flags);
-        if (sent2 == -1) {
-            perror("send failed");
-            return 1;
-        }
-        sent += (size_t)sent2;
-    }
-    return 0;
-}
 
 static int state = 0;
 static pthread_mutex_t state_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -71,14 +43,6 @@ void *stdinreader(void *arg) {
     }
     return NULL;
 }
-
-typedef struct video_args_ {
-    int videoout1fd;
-    int videoout2fd;
-    int sockfd;
-} video_args;
-
-void *videotalk(const void *arg) { video_args *v = arg; }
 
 int main(int argc, char **argv) {
     if (argc != 6) {
@@ -110,6 +74,7 @@ int main(int argc, char **argv) {
     addr1.sin_port = htons(atoi(argv[2]));
     addr2.sin_family = AF_INET;
     addr2.sin_port = htons(atoi(argv[3]));
+    struct sockaddr_in client_addr_video;
     bool is_server = strcmp(argv[1], "-l") == 0;
     int s;
     if (is_server) {
@@ -138,7 +103,7 @@ int main(int argc, char **argv) {
             return 2;
         }
         struct sockaddr_in client_addr;
-        socklen_t len = sizeof(struct sockaddr_in);
+        socklen_t len = sizeof(client_addr);
         s = accept(ss, (struct sockaddr *)&client_addr, &len);
         close(ss);
         if (s == -1) {
@@ -148,6 +113,29 @@ int main(int argc, char **argv) {
         }
         fprintf(stderr, "connected from %s:%u\n",
                 inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
+        socklen_t len_v = sizeof(client_addr_video);
+        char buf[3];
+        ssize_t n;
+        do {
+            n = recvfrom(v_s, buf, sizeof(buf), 0,
+                         (struct sockaddr *)&client_addr_video, &len_v);
+            assert(len_v == sizeof(client_addr_video));
+            if (n == -1) {
+                perror("recvfrom");
+                close(s);
+                close(v_s);
+                return 2;
+            }
+        } while (!(n >= 3 && buf[0] == 'C' && buf[1] == 'O' && buf[2] == 'N'));
+        if (connect(v_s, (struct sockaddr *)&client_addr_video, len_v) == -1) {
+            perror("connect");
+            close(s);
+            close(v_s);
+            return 2;
+        }
+        fprintf(stderr, "connected video from %s:%u\n",
+                inet_ntoa(client_addr_video.sin_addr),
+                ntohs(client_addr_video.sin_port));
     } else {
         if (inet_aton(argv[1], &addr1.sin_addr) == 0 ||
             inet_aton(argv[1], &addr2.sin_addr) == 0) {
@@ -165,6 +153,12 @@ int main(int argc, char **argv) {
             return 2;
         }
         fprintf(stderr, "connected\n");
+        char buf[3] = {'C', 'O', 'N'};
+        if (send(v_s, buf, 3, 0) == -1) {
+            close(ss);
+            close(v_s);
+            return 2;
+        }
     }
     pthread_mutex_lock(&state_lock);
     state = 1;
@@ -192,7 +186,7 @@ int main(int argc, char **argv) {
     }
 
     pthread_t v_threadid;
-    const video_args varg = {
+    video_args varg = {
         .videoout1fd = vo1fd, .videoout2fd = vo2fd, .sockfd = v_s};
     err = pthread_create(&v_threadid, NULL, videotalk, &varg);
     if (err != 0) {
