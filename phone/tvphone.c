@@ -1,6 +1,7 @@
 #include <arpa/inet.h>
 #include <errno.h>
 #include <linux/videodev2.h>
+#include <fcntl.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
@@ -20,6 +21,7 @@ static char data[N];
 int write_force(int fildes, const void *ptr, size_t nbyte);
 int send_force(int socket, const void *buffer, size_t length, int flags);
 void *stdinreader(void *arg);
+void *videotalk(const void *arg);
 
 int write_force(int fildes, const void *ptr, size_t nbyte) {
     size_t written = 0;
@@ -70,19 +72,19 @@ void *stdinreader(void *arg) {
     return NULL;
 }
 
-struct {
+typedef struct video_args_ {
     int videoout1fd;
     int videoout2fd;
     int sockfd;
 } video_args;
 
-void *videotalk(void *arg) {
-    struct video_args *arg_ = arg;
-}
+void *videotalk(const void *arg) { video_args *v = arg; }
 
 int main(int argc, char **argv) {
-    if (argc != 5) {
-        fprintf(stderr, "usage: %s ADDRESS PORT VIDEO_OUTPUT1 VIDEO_OUTPUT2\n", argv[0]);
+    if (argc != 6) {
+        fprintf(stderr,
+                "usage: %s ADDRESS PORT1 PORT2 VIDEO_OUTPUT1 VIDEO_OUTPUT2\n",
+                argv[0]);
         return 1;
     }
     pthread_t threadid;
@@ -97,41 +99,69 @@ int main(int argc, char **argv) {
         perror("socket");
         return 2;
     }
-    struct sockaddr_in addr;
-    addr.sin_family = AF_INET;
-    addr.sin_port = htons(atoi(argv[2]));
+    int v_s = socket(PF_INET, SOCK_DGRAM, 0);
+    if (v_s == -1) {
+        perror("socket");
+        close(ss);
+        return 2;
+    }
+    struct sockaddr_in addr1, addr2;
+    addr1.sin_family = AF_INET;
+    addr1.sin_port = htons(atoi(argv[2]));
+    addr2.sin_family = AF_INET;
+    addr2.sin_port = htons(atoi(argv[3]));
     bool is_server = strcmp(argv[1], "-l") == 0;
     int s;
     if (is_server) {
-        addr.sin_addr.s_addr = INADDR_ANY;
-        if (bind(ss, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+        int soval = 1;
+        if (setsockopt(ss, SOL_SOCKET, SO_REUSEADDR, &soval, sizeof(soval)) ==
+                -1 ||
+            setsockopt(v_s, SOL_SOCKET, SO_REUSEADDR, &soval, sizeof(soval)) ==
+                -1) {
+            perror("setsockopt");
+            close(ss);
+            close(v_s);
+            return 2;
+        }
+        addr1.sin_addr.s_addr = addr2.sin_addr.s_addr = INADDR_ANY;
+        if (bind(ss, (struct sockaddr *)&addr1, sizeof(addr1)) == -1 ||
+            bind(v_s, (struct sockaddr *)&addr2, sizeof(addr2)) == -1) {
             perror("bind");
             close(ss);
+            close(v_s);
             return 2;
         }
         if (listen(ss, 10) == -1) {
             perror("listen");
             close(ss);
+            close(v_s);
             return 2;
         }
         struct sockaddr_in client_addr;
         socklen_t len = sizeof(struct sockaddr_in);
         s = accept(ss, (struct sockaddr *)&client_addr, &len);
+        close(ss);
         if (s == -1) {
             perror("accept");
-            close(ss);
+            close(v_s);
             return 2;
         }
         fprintf(stderr, "connected from %s:%u\n",
                 inet_ntoa(client_addr.sin_addr), ntohs(client_addr.sin_port));
     } else {
-        if (inet_aton(argv[1], &addr.sin_addr) == 0) {
+        if (inet_aton(argv[1], &addr1.sin_addr) == 0 ||
+            inet_aton(argv[1], &addr2.sin_addr) == 0) {
             fprintf(stderr, "invalid ipaddress\n");
+            close(ss);
+            close(v_s);
             return 2;
         }
         s = ss;
-        if (connect(s, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+        if (connect(s, (struct sockaddr *)&addr1, sizeof(addr1)) == -1 ||
+            connect(v_s, (struct sockaddr *)&addr2, sizeof(addr2)) == -1) {
             perror("connect");
+            close(ss);
+            close(v_s);
             return 2;
         }
         fprintf(stderr, "connected\n");
@@ -143,19 +173,33 @@ int main(int argc, char **argv) {
     pthread_join(threadid, &ret);
     if (ret != NULL) {
         close(s);
-        if (is_server) {
-            close(ss);
+        close(v_s);
+        return 2;
+    }
+    int vo1fd = open(argv[4], O_WRONLY);
+    int vo2fd = open(argv[5], O_WRONLY);
+    if (vo1fd == -1 || vo2fd == -1) {
+        perror("open");
+        if (vo1fd != -1) {
+            close(vo1fd);
         }
+        if (vo2fd != -1) {
+            close(vo2fd);
+        }
+        close(s);
+        close(v_s);
         return 2;
     }
 
     pthread_t v_threadid;
-    err = pthread_create(&v_threadid, NULL, videotalk, NULL);
+    const video_args varg = {
+        .videoout1fd = vo1fd, .videoout2fd = vo2fd, .sockfd = v_s};
+    err = pthread_create(&v_threadid, NULL, videotalk, &varg);
     if (err != 0) {
         errno = err;
         perror("pthread_create");
-        close(ss);
         close(s);
+        close(v_s);
         return 2;
     }
 
@@ -186,8 +230,6 @@ int main(int argc, char **argv) {
         failed = write_force(1, data, sizeof(char) * (size_t)n);
     }
     close(s);
-    if (is_server) {
-        close(ss);
-    }
+    close(v_s);
     return failed;
 }
