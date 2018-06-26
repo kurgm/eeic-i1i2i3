@@ -1,22 +1,30 @@
 #!/usr/bin/env bash
 
 usage_exit() {
-  echo "usage: $0 [-p AUDIOPORT] [-q VIDEOPORT] {-l | ADDRESS}" 1>&2
+  echo "usage: $0 [-p AUDIOPORT] [-q VIDEOPORT] [-u VIDEOPIPE1] [-u VIDEOPIPE2] {-l | ADDRESS}" 1>&2
   exit 1
 }
 
 
 APORT=50000
 VPORT=50001
+VPIPE1=video1
+VPIPE2=video2
 ADDR=
 
-while getopts p:q:lh OPT; do
+while getopts p:q:u:v:lh OPT; do
   case $OPT in
     p)
       APORT=$OPTARG
     ;;
     q)
       VPORT=$OPTARG
+    ;;
+    u)
+      VPIPE1=$OPTARG
+    ;;
+    v)
+      VPIPE2=$OPTARG
     ;;
     l)
       ADDR=-l
@@ -29,22 +37,28 @@ done
 
 shift $((OPTIND - 1))
 
-if [ ! \( $# -eq 0 -a "$ADDR" = -l -o $# -eq 1 -a -z "$ADDR" \) ]; then
+if [ $# -eq 0 -a "$ADDR" = -l ]; then
+  :
+elif [ $# -eq 1 -a -z "$ADDR" ]; then
+  ADDR=$1
+else
   usage_exit
 fi
 
-if [ ! -p video1 ]; then
-  mkfifo video1
+if [ ! -p "$VPIPE1" ]; then
+  mkfifo "$VPIPE1"
 fi
-if [ ! -p video2 ]; then
-  mkfifo video2
+if [ ! -p "$VPIPE2" ]; then
+  mkfifo "$VPIPE2"
 fi
 
-gnome-terminal --zoom=0.4 --geometry=160x60+0+0 -- cat video1
-gnome-terminal --zoom=0.4 --geometry=160x60+1000+0 -- cat video2
+gnome-terminal --zoom=0.4 --geometry=160x60+0+0 -- cat "$VPIPE1"
+gnome-terminal --zoom=0.4 --geometry=160x60+1000+0 -- cat "$VPIPE2"
 
 rec -t raw -b 16 -e s -c 1 -r 44100 - 2> /dev/null \
-| ./tvphone $1 50000 50001 video1 video2 \
+| ./tvphone $ADDR 50000 50001 "$VPIPE1" "$VPIPE2" \
 | play -t raw -b 16 -e s -c 1 -r 44100 - 2> /dev/null
 
-rm video1 video2
+echo disconnected
+
+rm "$VPIPE1" "$VPIPE2"
