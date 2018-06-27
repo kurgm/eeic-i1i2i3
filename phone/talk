@@ -52,8 +52,8 @@ if [ ! -p "$VPIPE2" ]; then
   mkfifo "$VPIPE2"
 fi
 
-gnome-terminal --zoom=0.4 --geometry=160x61+0+0 -- cat "$VPIPE1"
-gnome-terminal --zoom=0.6 --geometry=160x61+540+0 -- cat "$VPIPE2"
+gnome-terminal --zoom=0.3 --geometry=160x61+0+0 -- cat "$VPIPE1"
+gnome-terminal --zoom=0.5 --geometry=160x61+550+0 -- cat "$VPIPE2"
 
 rec -t raw -b 16 -e s -c 1 -r 44100 - 2> /dev/null \
 | ./tvphone "$ADDR" "$APORT" "$VPORT" "$VPIPE1" "$VPIPE2" \

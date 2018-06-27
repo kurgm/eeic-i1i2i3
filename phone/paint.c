@@ -155,9 +155,11 @@ static void draw_circle(const int cx, const int cy, const int r) {
 
 static void draw_oval(const int cx, const int cy, const int rx, const int ry) {
     double n = 2 * M_PI * max(rx, ry);
-    for (int i = 0; i < n; i++) {
+    for (int i = 0; i <= n / 2 + 1; i++) {
         draw_point((int)(cx + rx * cos(2 * i * M_PI / n)),
                    (int)(cy + ry * sin(2 * i * M_PI / n)));
+        draw_point((int)(cx + rx * cos(2 * i * M_PI / n)),
+                   (int)(cy - ry * sin(2 * i * M_PI / n)));
     }
 }
 

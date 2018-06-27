@@ -36,6 +36,9 @@ struct buffer {
 static struct buffer *buffers;
 static unsigned int n_buffers;
 
+static char tty_promptstr[100] = "\033[2K\033[1G  1 > ";
+static pthread_mutex_t tty_promptstr_lock = PTHREAD_MUTEX_INITIALIZER;
+
 static void errno_exit(const char *s) __attribute__((noreturn));
 static void errno_exit(const char *s) {
     fprintf(stderr, "%s error %d, %s\n", s, errno, strerror(errno));
@@ -379,6 +382,7 @@ static pthread_mutex_t ttyout_lock = PTHREAD_MUTEX_INITIALIZER;
 static void ttyputs(const char *s) {
     pthread_mutex_lock(&ttyout_lock);
     fputs(s, tty_out);
+    fflush(tty_out);
     pthread_mutex_unlock(&ttyout_lock);
 }
 
@@ -396,7 +400,6 @@ static void respond(const char *s) {
 static void execute_received_paint_command(const char *buf) {
     Command command;
     interpret_command(&command, buf, respond);
-    // interpret_command(&command, buf, ttyputs);
     if (command.error != 0) {
         return;
     }
@@ -407,7 +410,6 @@ static void execute_received_paint_command(const char *buf) {
     }
     pthread_mutex_lock(&canvas_lock);
     execute_command(&command, respond);
-    // execute_command(&command, ttyputs);
     pthread_mutex_unlock(&canvas_lock);
     if (command.kind == cmdSAVE || command.kind == cmdLOAD ||
         command.kind == cmdEXPORT || command.kind == cmdUNDO) {
@@ -416,10 +418,25 @@ static void execute_received_paint_command(const char *buf) {
     }
 }
 
+static void print_prompt() {
+    pthread_mutex_lock(&tty_promptstr_lock);
+    ttyputs(tty_promptstr);
+    pthread_mutex_unlock(&tty_promptstr_lock);
+}
+
+static void send_prompt(int count) {
+    char sendbuf[100];
+    sendbuf[0] = 'P';
+    sendbuf[1] = 'N';
+    sendbuf[2] = 'C';
+    snprintf(sendbuf + 3, sizeof(sendbuf) - 3, "\033[2K\033[1G%3d > ",
+             count + 1);
+    send(v_arg->sockfd, sendbuf, strlen(sendbuf), 0);
+}
+
 static void *video_recv(void *arg) {
     static char recvbuf[sizeof(image_t) + 10];
     (void)arg;
-    respond("1 > ");
     while (1) {
         ssize_t n = recv(v_arg->sockfd, recvbuf, sizeof(recvbuf) - 1, 0);
         if (n == -1) {
@@ -436,12 +453,17 @@ static void *video_recv(void *arg) {
             recvbuf[n] = '\0';
             // fprintf(stderr, "paint command received: %s\n", recvbuf + 3);
             execute_received_paint_command(recvbuf + 3);
-            char sendbuf[100];
-            snprintf(sendbuf, sizeof(sendbuf), "%d > ", get_history_num() + 1);
-            respond(sendbuf);
+            send_prompt(get_history_num() + 1);
         } else if (recvbuf[0] == 'P' && recvbuf[1] == 'N' &&
                    recvbuf[2] == 'R') {
             ttyputs(recvbuf + 3);
+        } else if (recvbuf[0] == 'P' && recvbuf[1] == 'N' &&
+                   recvbuf[2] == 'C') {
+            pthread_mutex_lock(&tty_promptstr_lock);
+            strncpy(tty_promptstr, recvbuf + 3, sizeof(tty_promptstr));
+            tty_promptstr[sizeof(tty_promptstr) - 1] = '\0';
+            pthread_mutex_unlock(&tty_promptstr_lock);
+            print_prompt();
         } else {
             fprintf(
                 stderr,
@@ -478,6 +500,9 @@ static void load_history_file(const char *filename) {
             load_history_file(command.args.strarg);
         }
         char sendbuf[BUFSIZE + 3];
+        sendbuf[0] = 'P';
+        sendbuf[1] = 'N';
+        sendbuf[2] = 'T';
         strcpy(sendbuf + 3, buf);
         send(v_arg->sockfd, sendbuf, 3 + strlen(buf) + 1, 0);
     }
@@ -509,22 +534,25 @@ static void *paint_input_recv(void *arg) {
             // putc('\n', stdout);
             // break;
             ttyputs("quit\nerror: that command is disabled.\n");
+            print_prompt();
             continue;
         }
 
         interpret_command(&command, buf, ttyputs);
         if (command.error != 0) {
+            print_prompt();
             continue;
         }
         if (command.kind == cmdLOAD) {
             load_history_file(command.args.strarg);
+        } else {
+            char sendbuf[BUFSIZE + 3];
+            sendbuf[0] = 'P';
+            sendbuf[1] = 'N';
+            sendbuf[2] = 'T';
+            strcpy(sendbuf + 3, buf);
+            send(v_arg->sockfd, sendbuf, 3 + strlen(buf) + 1, 0);
         }
-        char sendbuf[BUFSIZE + 3];
-        sendbuf[0] = 'P';
-        sendbuf[1] = 'N';
-        sendbuf[2] = 'T';
-        strcpy(sendbuf + 3, buf);
-        send(v_arg->sockfd, sendbuf, 3 + strlen(buf) + 1, 0);
     }
     return NULL;
 }
