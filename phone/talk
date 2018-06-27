@@ -56,7 +56,7 @@ gnome-terminal --zoom=0.4 --geometry=160x61+0+0 -- cat "$VPIPE1"
 gnome-terminal --zoom=0.6 --geometry=160x61+540+0 -- cat "$VPIPE2"
 
 rec -t raw -b 16 -e s -c 1 -r 44100 - 2> /dev/null \
-| ./tvphone $ADDR 50000 50001 "$VPIPE1" "$VPIPE2" \
+| ./tvphone "$ADDR" "$APORT" "$VPORT" "$VPIPE1" "$VPIPE2" \
 | play -t raw -b 16 -e s -c 1 -r 47000 - 2> /dev/null
 
 echo disconnected
