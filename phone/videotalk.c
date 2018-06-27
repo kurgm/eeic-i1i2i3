@@ -431,16 +431,17 @@ static void send_prompt(int count) {
     sendbuf[2] = 'C';
     snprintf(sendbuf + 3, sizeof(sendbuf) - 3, "\033[2K\033[1G%3d > ",
              count + 1);
-    send(v_arg->sockfd, sendbuf, strlen(sendbuf), 0);
+    send(v_arg->sockfd, sendbuf, strlen(sendbuf) + 1, 0);
 }
 
 static void *video_recv(void *arg) {
     static char recvbuf[sizeof(image_t) + 10];
     (void)arg;
+    send_prompt(get_history_num () + 1);
     while (1) {
         ssize_t n = recv(v_arg->sockfd, recvbuf, sizeof(recvbuf) - 1, 0);
         if (n == -1) {
-            errno_exit("recvfrom");
+            errno_exit("recv");
         }
         // fprintf(stderr, "received command size: %d\n", n);
         if (n < 3) {
