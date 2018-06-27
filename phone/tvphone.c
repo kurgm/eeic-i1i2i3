@@ -20,25 +20,35 @@
 
 #define N 2048
 
-static char data[N];
+static char recvdata[N];
+static char senddata[N];
 void *stdinreader(void *arg);
 
-static int state = 0;
-static pthread_mutex_t state_lock = PTHREAD_MUTEX_INITIALIZER;
+static int asock = -1;
+static pthread_mutex_t asock_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void *stdinreader(void *arg) {
     (void)arg;
-    while (1) {
-        pthread_mutex_lock(&state_lock);
-        int current_state = state;
-        pthread_mutex_unlock(&state_lock);
-        if (current_state == 1) {
-            break;
-        }
-        ssize_t n = read(0, data, N);
+    int asock_ = -1;
+    ssize_t n = 0;
+    while (asock_ == -1) {
+        n = read(0, senddata, sizeof(senddata));
         if (n == -1) {
             perror("read failed");
-            return (void *)1;
+            exit(1);
+        }
+        pthread_mutex_lock(&asock_lock);
+        asock_ = asock;
+        pthread_mutex_unlock(&asock_lock);
+    }
+    while (1) {
+        if (send_force(asock_, senddata, sizeof(char) * (size_t)n, 0)) {
+            exit(1);
+        }
+        n = read(0, senddata, sizeof(senddata));
+        if (n == -1) {
+            perror("read failed");
+            exit(1);
         }
     }
     return NULL;
@@ -160,16 +170,9 @@ int main(int argc, char **argv) {
             return 2;
         }
     }
-    pthread_mutex_lock(&state_lock);
-    state = 1;
-    pthread_mutex_unlock(&state_lock);
-    void *ret;
-    pthread_join(threadid, &ret);
-    if (ret != NULL) {
-        close(s);
-        close(v_s);
-        return 2;
-    }
+    pthread_mutex_lock(&asock_lock);
+    asock = s;
+    pthread_mutex_unlock(&asock_lock);
     int vo1fd = open(argv[4], O_WRONLY);
     int vo2fd = open(argv[5], O_WRONLY);
     if (vo1fd == -1 || vo2fd == -1) {
@@ -199,20 +202,7 @@ int main(int argc, char **argv) {
 
     int failed = 0;
     while (!failed) {
-        ssize_t n = read(0, data, sizeof(data));
-        if (n == 0) {
-            break;
-        }
-        if (n == -1) {
-            perror("read failed");
-            failed = 1;
-            break;
-        }
-        failed = send_force(s, data, sizeof(char) * (size_t)n, 0);
-        if (failed) {
-            break;
-        }
-        n = recv(s, data, sizeof(data), 0);
+        ssize_t n = recv(s, recvdata, sizeof(recvdata), 0);
         if (n == 0) {
             break;
         }
@@ -221,7 +211,7 @@ int main(int argc, char **argv) {
             failed = 1;
             break;
         }
-        failed = write_force(1, data, sizeof(char) * (size_t)n);
+        failed = write_force(1, recvdata, sizeof(char) * (size_t)n);
     }
     close(s);
     close(v_s);
