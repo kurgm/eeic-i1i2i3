@@ -71,9 +71,9 @@ int main(int argc, char **argv) {
     }
     struct sockaddr_in addr1, addr2;
     addr1.sin_family = AF_INET;
-    addr1.sin_port = htons(atoi(argv[2]));
+    addr1.sin_port = htons((uint16_t)atoi(argv[2]));
     addr2.sin_family = AF_INET;
-    addr2.sin_port = htons(atoi(argv[3]));
+    addr2.sin_port = htons((uint16_t)atoi(argv[3]));
     struct sockaddr_in client_addr_video;
     bool is_server = strcmp(argv[1], "-l") == 0;
     int s;

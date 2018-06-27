@@ -36,12 +36,13 @@ struct buffer {
 static struct buffer *buffers;
 static unsigned int n_buffers;
 
+static void errno_exit(const char *s) __attribute__((noreturn));
 static void errno_exit(const char *s) {
     fprintf(stderr, "%s error %d, %s\n", s, errno, strerror(errno));
     exit(EXIT_FAILURE);
 }
 
-static int xioctl(int fh, int request, void *arg) {
+static int xioctl(int fh, unsigned long request, void *arg) {
     int r;
 
     do {
@@ -227,7 +228,7 @@ static void start_capturing(void) {
     if (-1 == xioctl(fd, VIDIOC_STREAMON, &type)) errno_exit("VIDIOC_STREAMON");
 }
 
-static void print_image(int fd, const image_t img) {
+static void print_image(int outfd, const image_t img) {
     char buffer[12 + IMG_HEIGHT * (20 * IMG_WIDTH + 6) + 10];
     int idx = 0;
     idx += sprintf(buffer + idx, "\033[3;J\033[H\033[2J");
@@ -244,27 +245,30 @@ static void print_image(int fd, const image_t img) {
         }
         idx += sprintf(buffer + idx, "\033[0m\n");
     }
-    write_force(fd, buffer, idx);
+    write_force(outfd, buffer, (size_t)idx);
 }
 
 static image_t self_img;
 static pthread_mutex_t canvas_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static void process_image(const void *p, int size) {
+static void process_image(const void *p, size_t size) {
     (void)size;
     for (int y = 0; y < 120; y += 2) {
         for (int x = 0; x < 160; x += 1) {
-            int value = ((unsigned char *)p)[((y * 160) + x) * 2];
-            int cb = ((unsigned char *)p)[((y * 160) + x) / 2 * 4 + 1];
-            int cr = ((unsigned char *)p)[((y * 160) + x) / 2 * 4 + 3];
+            int value = ((const unsigned char *)p)[((y * 160) + x) * 2];
+            int cb = ((const unsigned char *)p)[((y * 160) + x) / 2 * 4 + 1];
+            int cr = ((const unsigned char *)p)[((y * 160) + x) / 2 * 4 + 3];
             cb -= 128;
             cr -= 128;
             double r = value + 1.402 * cr;
             double g = value - 0.344 * cb - 0.714 * cr;
             double b = value + 1.772 * cb;
-            self_img[y / 2][x].r = r > 255 ? 255 : r < 0 ? 0 : (int)round(r);
-            self_img[y / 2][x].g = g > 255 ? 255 : g < 0 ? 0 : (int)round(g);
-            self_img[y / 2][x].b = b > 255 ? 255 : b < 0 ? 0 : (int)round(b);
+            self_img[y / 2][x].r =
+                r > 255 ? 255 : r < 0 ? 0 : (unsigned char)(double)round(r);
+            self_img[y / 2][x].g =
+                g > 255 ? 255 : g < 0 ? 0 : (unsigned char)(double)round(g);
+            self_img[y / 2][x].b =
+                b > 255 ? 255 : b < 0 ? 0 : (unsigned char)(double)round(b);
         }
     }
     pthread_mutex_lock(&canvas_lock);
@@ -310,26 +314,27 @@ static int read_frame(void) {
     return 1;
 }
 
-static void stop_capturing(void) {
-    enum v4l2_buf_type type;
-    type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-    if (-1 == xioctl(fd, VIDIOC_STREAMOFF, &type))
-        errno_exit("VIDIOC_STREAMOFF");
-}
+// static void stop_capturing(void) {
+//     enum v4l2_buf_type type;
+//     type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+//     if (-1 == xioctl(fd, VIDIOC_STREAMOFF, &type))
+//         errno_exit("VIDIOC_STREAMOFF");
+// }
 
-static void uninit_device(void) {
-    unsigned int i;
-    for (i = 0; i < n_buffers; ++i)
-        if (-1 == munmap(buffers[i].start, buffers[i].length))
-            errno_exit("munmap");
-}
+// static void uninit_device(void) {
+//     unsigned int i;
+//     for (i = 0; i < n_buffers; ++i)
+//         if (-1 == munmap(buffers[i].start, buffers[i].length))
+//             errno_exit("munmap");
+// }
 
-static void close_device(void) {
-    if (close(fd) == -1) errno_exit("close");
+// static void close_device(void) {
+//     if (close(fd) == -1) errno_exit("close");
 
-    fd = -1;
-}
+//     fd = -1;
+// }
 
+static void video_send(void) __attribute__((noreturn));
 static void video_send(void) {
     open_device();
     init_device();
@@ -363,9 +368,9 @@ static void video_send(void) {
             /* EAGAIN - continue select loop. */
         }
     }
-    stop_capturing();
-    uninit_device();
-    close_device();
+    // stop_capturing();
+    // uninit_device();
+    // close_device();
 }
 
 static FILE *tty_out = NULL;
@@ -416,7 +421,7 @@ static void *video_recv(void *arg) {
     (void)arg;
     respond("1 > ");
     while (1) {
-        int n = recv(v_arg->sockfd, recvbuf, sizeof(recvbuf) - 1, 0);
+        ssize_t n = recv(v_arg->sockfd, recvbuf, sizeof(recvbuf) - 1, 0);
         if (n == -1) {
             errno_exit("recvfrom");
         }
@@ -485,6 +490,7 @@ static void load_history_file(const char *filename) {
 }
 
 static void *paint_input_recv(void *arg) {
+    (void)arg;
     FILE *tty_in = fopen("/dev/tty", "r");
     if (tty_in == NULL) {
         errno_exit("open tty");
@@ -520,6 +526,7 @@ static void *paint_input_recv(void *arg) {
         strcpy(sendbuf + 3, buf);
         send(v_arg->sockfd, sendbuf, 3 + strlen(buf) + 1, 0);
     }
+    return NULL;
 }
 
 void *videotalk(void *arg) {
