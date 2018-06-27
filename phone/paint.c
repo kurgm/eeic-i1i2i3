@@ -66,7 +66,7 @@ static void pop_back_history() {
     history_size--;
 }
 
-int get_history_num() { return history_size; };
+int get_history_num() { return history_size; }
 
 void init_canvas() {
     currentColor.r = currentColor.g = currentColor.b = 0;
@@ -152,27 +152,23 @@ static void draw_circle(const int cx, const int cy, const int r) {
         draw_point(cx - j, cy + i);
     }
 }
-static void draw_oval(const int cx, const int cy, const int r, const int a,
-                      const int b) {
-    double p = M_PI;
-    double n = 4 * r * max(a, b);
+
+static void draw_oval(const int cx, const int cy, const int rx, const int ry) {
+    double n = 2 * M_PI * max(rx, ry);
     for (int i = 0; i < n; i++) {
-        draw_point(cx + a * cos(2.0 * i * p / n),
-                   cy + b * sin(2.0 * i * p / n));
+        draw_point((int)(cx + rx * cos(2 * i * M_PI / n)),
+                   (int)(cy + ry * sin(2 * i * M_PI / n)));
     }
 }
 
-static void draw_oval_fill(const int cx, const int cy, const int r, const int a,
-                           const int b) {
-    double p = M_PI;
-    double n = 4 * r * max(a, b);
-    draw_line(cx, cy + b, cx, cy - b);
-    draw_line(cx - a, cy, cx + a, cy);
-    for (int i = 0; i < n; i++) {
-        draw_line(cx + a * cos(2 * i * p / n), cy + b * sin(2 * i * p / n),
-                  cx - a * cos(2 * i * p / n), cy - b * sin(2 * i * p / n));
-        draw_line(cx + a * cos(2 * i * p / n), cy + b * sin(2 * i * p / n),
-                  cx - a * cos(2 * i * p / n), cy + b * sin(2 * i * p / n));
+static void draw_oval_fill(const int cx, const int cy, const int rx,
+                           const int ry) {
+    double n = 2 * M_PI * max(rx, ry);
+    for (int i = 0; i <= n / 2 + 1; i++) {
+        draw_line((int)(cx + rx * cos(2 * i * M_PI / n)),
+                  (int)(cy + ry * sin(2 * i * M_PI / n)),
+                  (int)(cx + rx * cos(2 * i * M_PI / n)),
+                  (int)(cy - ry * sin(2 * i * M_PI / n)));
     }
 }
 
@@ -200,10 +196,11 @@ static void draw_circle_fill(const int cx, const int cy, const int r) {
 
 static void export_bmp(const char *filename) {
     FILE *fp;
-    char bitmapfileheader[14] = {'B', 'M', 0, 0, 0, 0, 0, 0, 0, 0, 54, 0, 0, 0};
-    char bitmapinfoheader[40] = {40, 0,  0, 0, 0, 0, 0, 0, 0, 0, 0,  0,  1, 0,
-                                 24, 0,  0, 0, 0, 0, 0, 0, 0, 0, 18, 11, 0, 0,
-                                 18, 11, 0, 0, 2, 0, 0, 0, 2, 0, 0,  0};
+    unsigned char bitmapfileheader[14] = {'B', 'M', 0, 0,  0, 0, 0,
+                                          0,   0,   0, 54, 0, 0, 0};
+    unsigned char bitmapinfoheader[40] = {
+        40, 0, 0, 0, 0,  0,  0, 0, 0,  0,  0, 0, 1, 0, 24, 0, 0, 0, 0, 0,
+        0,  0, 0, 0, 18, 11, 0, 0, 18, 11, 0, 0, 2, 0, 0,  0, 2, 0, 0, 0};
     const int padperrow = (4 - (3 * IMG_WIDTH) % 4) % 4;
     const int bitmapsize = (3 * IMG_WIDTH + padperrow) * IMG_HEIGHT;
     int x, y;
@@ -304,14 +301,12 @@ static void export_svg(const char *filename) {
             fprintf(fp,
                     "<ellipse cx=\"%d\" cy=\"%d\" rx=\"%d\" ry=\"%d\" "
                     "fill=\"%s\" stroke=\"none\" />",
-                    args[0], args[1], args[2] * args[3], args[2] * args[4],
-                    svgColorString);
+                    args[0], args[1], args[2], args[3], svgColorString);
         } else if (command.kind == cmdOVAL) {
             fprintf(fp,
                     "<ellipse cx=\"%d\" cy=\"%d\" rx=\"%d\" ry=\"%d\" "
                     "stroke=\"%s\" fill=\"none\" />",
-                    args[0], args[1], args[2] * args[3], args[2] * args[4],
-                    svgColorString);
+                    args[0], args[1], args[2], args[3], svgColorString);
         } else if (command.kind == cmdSETCOLOR) {
             sprintf(svgColorString, "#%02x%02x%02x", args[0], args[1], args[2]);
         }
@@ -484,17 +479,16 @@ void interpret_command(Command *result, const char *command,
         return;
     }
     if (strcmp(s, "oval") == 0 || strcmp(s, "ovalfill") == 0) {
-        int cx, cy, r, a, b;
+        int cx, cy, rx, ry;
         if (interpret_number(strtok_r(NULL, " ", &saveptr), &cx) ||
             interpret_number(strtok_r(NULL, " ", &saveptr), &cy) ||
-            interpret_number(strtok_r(NULL, " ", &saveptr), &r) ||
-            interpret_number(strtok_r(NULL, " ", &saveptr), &a) ||
-            interpret_number(strtok_r(NULL, " ", &saveptr), &b)) {
+            interpret_number(strtok_r(NULL, " ", &saveptr), &rx) ||
+            interpret_number(strtok_r(NULL, " ", &saveptr), &ry)) {
             respond("error: invalid argument.\n");
             result->error = 1;
             return;
         }
-        if (r < 0 || a < 0 || b < 0) {
+        if (rx < 0 || ry < 0) {
             respond("error: invalid argument.\n");
             result->error = 1;
             return;
@@ -506,9 +500,8 @@ void interpret_command(Command *result, const char *command,
         }
         result->args.intargs[0] = cx;
         result->args.intargs[1] = cy;
-        result->args.intargs[2] = r;
-        result->args.intargs[3] = a;
-        result->args.intargs[4] = b;
+        result->args.intargs[2] = rx;
+        result->args.intargs[3] = ry;
         return;
     }
 
@@ -599,9 +592,9 @@ void execute_command(Command *command, responder respond) {
     } else if (command->kind == cmdCIRCLE) {
         draw_circle(args[0], args[1], args[2]);
     } else if (command->kind == cmdOVALFILL) {
-        draw_oval_fill(args[0], args[1], args[2], args[3], args[4]);
+        draw_oval_fill(args[0], args[1], args[2], args[3]);
     } else if (command->kind == cmdOVAL) {
-        draw_oval(args[0], args[1], args[2], args[3], args[4]);
+        draw_oval(args[0], args[1], args[2], args[3]);
     } else if (command->kind == cmdSETCOLOR) {
         currentColor.r = (unsigned char)args[0];
         currentColor.g = (unsigned char)args[1];

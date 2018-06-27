@@ -19,6 +19,5 @@ typedef struct pixelval_ {
 typedef pixelval image_t[IMG_HEIGHT][IMG_WIDTH];
 
 void *videotalk(void *arg);
-void print_image(int fd, const image_t img);
 
 #endif /* VIDEOTALK_H_ */

@@ -85,10 +85,7 @@ static void init_mmap(void) {
 
     if (-1 == xioctl(fd, VIDIOC_REQBUFS, &req)) {
         if (EINVAL == errno) {
-            fprintf(stderr,
-                    "%s does not support "
-                    "memory mapping\n",
-                    dev_name);
+            fprintf(stderr, "%s does not support memory mapping\n", dev_name);
             exit(EXIT_FAILURE);
         } else {
             errno_exit("VIDIOC_REQBUFS");
@@ -230,7 +227,7 @@ static void start_capturing(void) {
     if (-1 == xioctl(fd, VIDIOC_STREAMON, &type)) errno_exit("VIDIOC_STREAMON");
 }
 
-void print_image(int fd, const image_t img) {
+static void print_image(int fd, const image_t img) {
     char buffer[12 + IMG_HEIGHT * (20 * IMG_WIDTH + 6) + 10];
     int idx = 0;
     idx += sprintf(buffer + idx, "\033[3;J\033[H\033[2J");
@@ -374,7 +371,7 @@ static void video_send(void) {
 static FILE *tty_out = NULL;
 static pthread_mutex_t ttyout_lock = PTHREAD_MUTEX_INITIALIZER;
 
-void ttyputs(const char *s) {
+static void ttyputs(const char *s) {
     pthread_mutex_lock(&ttyout_lock);
     fputs(s, tty_out);
     pthread_mutex_unlock(&ttyout_lock);
@@ -382,7 +379,7 @@ void ttyputs(const char *s) {
 
 static size_t min_sizet(size_t a, size_t b) { return a < b ? a : b; }
 
-void respond(const char *s) {
+static void respond(const char *s) {
     char sendbuf[BUFSIZE + 3];
     sendbuf[0] = 'P';
     sendbuf[1] = 'N';
@@ -412,9 +409,6 @@ static void execute_received_paint_command(const char *buf) {
     } else {
         push_back_history(buf);
     }
-    char sendbuf[100];
-    snprintf(sendbuf, sizeof(sendbuf), "%d > ", get_history_num() + 1);
-    respond(sendbuf);
 }
 
 static void *video_recv(void *arg) {
@@ -426,7 +420,7 @@ static void *video_recv(void *arg) {
         if (n == -1) {
             errno_exit("recvfrom");
         }
-        fprintf(stderr, "received command size: %d\n", n);
+        // fprintf(stderr, "received command size: %d\n", n);
         if (n < 3) {
             continue;
         }
@@ -435,16 +429,20 @@ static void *video_recv(void *arg) {
         } else if (recvbuf[0] == 'P' && recvbuf[1] == 'N' &&
                    recvbuf[2] == 'T') {
             recvbuf[n] = '\0';
-            fprintf(stderr, "paint command received: %s\n", recvbuf + 3);
+            // fprintf(stderr, "paint command received: %s\n", recvbuf + 3);
             execute_received_paint_command(recvbuf + 3);
+            char sendbuf[100];
+            snprintf(sendbuf, sizeof(sendbuf), "%d > ", get_history_num() + 1);
+            respond(sendbuf);
         } else if (recvbuf[0] == 'P' && recvbuf[1] == 'N' &&
                    recvbuf[2] == 'R') {
             ttyputs(recvbuf + 3);
         } else {
-            fprintf(stderr,
-                    "unknown command %c%c%c(\"\\x%02x\\x%02x\\x%02x\")\n",
-                    recvbuf[0], recvbuf[1], recvbuf[2], recvbuf[0], recvbuf[1],
-                    recvbuf[2]);
+            fprintf(
+                stderr,
+                "unknown command received: %c%c%c(\"\\x%02x\\x%02x\\x%02x\")\n",
+                recvbuf[0], recvbuf[1], recvbuf[2], recvbuf[0], recvbuf[1],
+                recvbuf[2]);
         }
     }
     return NULL;
@@ -486,7 +484,7 @@ static void load_history_file(const char *filename) {
     fclose(fp);
 }
 
-void *paint_input_recv(void *arg) {
+static void *paint_input_recv(void *arg) {
     FILE *tty_in = fopen("/dev/tty", "r");
     if (tty_in == NULL) {
         errno_exit("open tty");

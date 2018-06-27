@@ -18,7 +18,7 @@
 #include "forceio.h"
 #include "videotalk.h"
 
-#define N 256
+#define N 2048
 
 static char data[N];
 void *stdinreader(void *arg);

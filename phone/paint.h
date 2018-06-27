@@ -22,7 +22,7 @@ typedef struct {
         cmdQUIT
     } kind;
     union {
-        int intargs[5];
+        int intargs[4];
         char strarg[100];
     } args;
 } Command;
