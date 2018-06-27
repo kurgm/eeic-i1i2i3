@@ -563,7 +563,18 @@ void interpret_command(Command *result, const char *command,
     }
 
     if (strcmp(s, "undo") == 0) {
+        int n = 1;
         result->kind = cmdUNDO;
+        s = strtok_r(NULL, " ", &saveptr);
+        if (s != NULL && interpret_number(s, &n)) {
+            respond("error: invalid argument.\n");
+            result->error = 1;
+            return;
+        }
+        if (n < 0) {
+            respond("error: invalid argument.\n");
+        }
+        result->args.intargs[0] = n;
         return;
     }
 
@@ -616,11 +627,14 @@ void execute_command(Command *command, responder respond) {
         }
     } else if (command->kind == cmdUNDO) {
         StringNode *node;
-        if (history_begin == NULL) {
-            respond("error: no history.\n");
-            return;
+        int i;
+        for (i = 0; i < args[0]; i++) {
+            if (history_begin == NULL) {
+                respond("error: no history.\n");
+                break;
+            }
+            pop_back_history();
         }
-        pop_back_history();
         init_canvas();
         for (node = history_begin; node != NULL; node = node->next) {
             Command cmd;
