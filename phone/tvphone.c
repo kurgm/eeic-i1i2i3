@@ -16,18 +16,18 @@
 #include <unistd.h>
 
 #include "forceio.h"
+#include "ttyio.h"
 #include "videotalk.h"
 
 #define N 2048
 
 static char recvdata[N];
 static char senddata[N];
-void *stdinreader(void *arg);
 
 static int asock = -1;
 static pthread_mutex_t asock_lock = PTHREAD_MUTEX_INITIALIZER;
 
-void *stdinreader(void *arg) {
+static void *stdinreader(void *arg) {
     (void)arg;
     int asock_ = -1;
     ssize_t n = 0;
@@ -52,6 +52,79 @@ void *stdinreader(void *arg) {
         }
     }
     return NULL;
+}
+
+static bool audio_sync = false;
+static pthread_mutex_t audio_sync_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static void ttyhandler(const char *input) {
+    if (input == NULL) {
+        // EOF
+        ttyputs("quit\nerror: that command is disabled.\n");
+        print_prompt();
+        return;
+    }
+    if (strcmp(input, "sync\n") == 0) {
+        pthread_mutex_lock(&audio_sync_lock);
+        audio_sync = true;
+        pthread_mutex_unlock(&audio_sync_lock);
+        return;
+    }
+    paint_input_handler(input);
+}
+
+static void *ttyin(void *arg) {
+    (void)arg;
+    ttyreader(ttyhandler);
+    return NULL;
+}
+
+static int audioreceiver(int sock) {
+    while (1) {
+        ssize_t n = recv(sock, recvdata, sizeof(recvdata), 0);
+        if (n == 0) {
+            return 0;
+        }
+        if (n == -1) {
+            perror("recv failed");
+            return 1;
+        }
+        pthread_mutex_lock(&audio_sync_lock);
+        bool sync_ = audio_sync;
+        pthread_mutex_unlock(&audio_sync_lock);
+        if (sync_) {
+            fprintf(stderr, "syncing...\n");
+            int skipped = 0;
+            while (1) {
+                struct timespec res1, res2;
+                clock_gettime(CLOCK_MONOTONIC_RAW, &res1);
+                n = recv(sock, recvdata, sizeof(recvdata), 0);
+                clock_gettime(CLOCK_MONOTONIC_RAW, &res2);
+                if (n == 0) {
+                    return 0;
+                }
+                if (n == -1) {
+                    perror("recv failed");
+                    return 1;
+                }
+                skipped++;
+                if ((res2.tv_sec - res1.tv_sec) +
+                        (res2.tv_nsec - res1.tv_nsec) / 1e9 >
+                    2 * N / 44100.0) {
+                    break;
+                }
+            }
+            fprintf(stderr, "sync done. skipped %d.\n", skipped);
+            pthread_mutex_lock(&audio_sync_lock);
+            audio_sync = false;
+            pthread_mutex_unlock(&audio_sync_lock);
+            print_prompt();
+        }
+        int failed = write_force(1, recvdata, sizeof(char) * (size_t)n);
+        if (failed) {
+            return failed;
+        }
+    }
 }
 
 int main(int argc, char **argv) {
@@ -188,6 +261,11 @@ int main(int argc, char **argv) {
         return 2;
     }
 
+    pthread_t tty_threadid;
+    pthread_create(&tty_threadid, NULL, ttyin, NULL);
+
+    ttyout_init();
+
     pthread_t v_threadid;
     video_args varg = {
         .videoout1fd = vo1fd, .videoout2fd = vo2fd, .sockfd = v_s};
@@ -200,19 +278,8 @@ int main(int argc, char **argv) {
         return 2;
     }
 
-    int failed = 0;
-    while (!failed) {
-        ssize_t n = recv(s, recvdata, sizeof(recvdata), 0);
-        if (n == 0) {
-            break;
-        }
-        if (n == -1) {
-            perror("recv failed");
-            failed = 1;
-            break;
-        }
-        failed = write_force(1, recvdata, sizeof(char) * (size_t)n);
-    }
+    int failed = audioreceiver(s);
+
     close(s);
     close(v_s);
     return failed;

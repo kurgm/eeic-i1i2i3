@@ -18,6 +18,7 @@ typedef struct pixelval_ {
 
 typedef pixelval image_t[IMG_HEIGHT][IMG_WIDTH];
 
+void paint_input_handler(const char *input);
 void *videotalk(void *arg);
 
 #endif /* VIDEOTALK_H_ */

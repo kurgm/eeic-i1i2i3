@@ -5,7 +5,7 @@ TARGETS = tvphone
 
 all: $(TARGETS)
 
-tvphone: tvphone.o videotalk.o forceio.o paint.o
+tvphone: tvphone.o videotalk.o forceio.o paint.o ttyio.o
 
 .PHONY: clean
 clean:

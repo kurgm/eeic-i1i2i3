@@ -20,6 +20,7 @@
 #include "forceio.h"
 #include "paint.h"
 #include "videotalk.h"
+#include "ttyio.h"
 
 #define BUFSIZE 1000
 
@@ -35,9 +36,6 @@ struct buffer {
 
 static struct buffer *buffers;
 static unsigned int n_buffers;
-
-static char tty_promptstr[100] = "\033[2K\033[1G  1 > ";
-static pthread_mutex_t tty_promptstr_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static void errno_exit(const char *s) __attribute__((noreturn));
 static void errno_exit(const char *s) {
@@ -376,16 +374,6 @@ static void video_send(void) {
     // close_device();
 }
 
-static FILE *tty_out = NULL;
-static pthread_mutex_t ttyout_lock = PTHREAD_MUTEX_INITIALIZER;
-
-static void ttyputs(const char *s) {
-    pthread_mutex_lock(&ttyout_lock);
-    fputs(s, tty_out);
-    fflush(tty_out);
-    pthread_mutex_unlock(&ttyout_lock);
-}
-
 static size_t min_sizet(size_t a, size_t b) { return a < b ? a : b; }
 
 static void respond(const char *s) {
@@ -418,12 +406,6 @@ static void execute_received_paint_command(const char *buf) {
     }
 }
 
-static void print_prompt() {
-    pthread_mutex_lock(&tty_promptstr_lock);
-    ttyputs(tty_promptstr);
-    pthread_mutex_unlock(&tty_promptstr_lock);
-}
-
 static void send_prompt(int count) {
     char sendbuf[100];
     sendbuf[0] = 'P';
@@ -437,7 +419,7 @@ static void send_prompt(int count) {
 static void *video_recv(void *arg) {
     static char recvbuf[sizeof(image_t) + 10];
     (void)arg;
-    send_prompt(get_history_num () + 1);
+    send_prompt(get_history_num() + 1);
     while (1) {
         ssize_t n = recv(v_arg->sockfd, recvbuf, sizeof(recvbuf) - 1, 0);
         if (n == -1) {
@@ -460,10 +442,7 @@ static void *video_recv(void *arg) {
             ttyputs(recvbuf + 3);
         } else if (recvbuf[0] == 'P' && recvbuf[1] == 'N' &&
                    recvbuf[2] == 'C') {
-            pthread_mutex_lock(&tty_promptstr_lock);
-            strncpy(tty_promptstr, recvbuf + 3, sizeof(tty_promptstr));
-            tty_promptstr[sizeof(tty_promptstr) - 1] = '\0';
-            pthread_mutex_unlock(&tty_promptstr_lock);
+            set_prompt(recvbuf + 3);
             print_prompt();
         } else {
             fprintf(
@@ -508,62 +487,40 @@ static void load_history_file(const char *filename) {
         send(v_arg->sockfd, sendbuf, 3 + strlen(buf) + 1, 0);
     }
 
-    pthread_mutex_lock(&ttyout_lock);
-    fprintf(tty_out, "loaded from \"%s\"\n", filename);
-    pthread_mutex_unlock(&ttyout_lock);
+    ttyputs("loaded from \"");
+    ttyputs(filename);
+    ttyputs("\"\n");
 
     fclose(fp);
 }
 
-static void *paint_input_recv(void *arg) {
-    (void)arg;
-    FILE *tty_in = fopen("/dev/tty", "r");
-    if (tty_in == NULL) {
-        errno_exit("open tty");
-    }
-    tty_out = fopen("/dev/tty", "w");
-    if (tty_out == NULL) {
-        errno_exit("open tty");
-    }
-    char buf[BUFSIZE];
+void paint_input_handler(const char *input) {
+    Command command;
 
-    init_canvas();
-
-    while (1) {
-        Command command;
-        if (fgets(buf, BUFSIZE, tty_in) == NULL) {
-            // putc('\n', stdout);
-            // break;
-            ttyputs("quit\nerror: that command is disabled.\n");
-            print_prompt();
-            continue;
-        }
-
-        interpret_command(&command, buf, ttyputs);
-        if (command.error != 0) {
-            print_prompt();
-            continue;
-        }
-        if (command.kind == cmdLOAD) {
-            load_history_file(command.args.strarg);
-        } else {
-            char sendbuf[BUFSIZE + 3];
-            sendbuf[0] = 'P';
-            sendbuf[1] = 'N';
-            sendbuf[2] = 'T';
-            strcpy(sendbuf + 3, buf);
-            send(v_arg->sockfd, sendbuf, 3 + strlen(buf) + 1, 0);
-        }
+    interpret_command(&command, input, ttyputs);
+    if (command.error != 0) {
+        print_prompt();
+        return;
     }
-    return NULL;
+    if (command.kind == cmdLOAD) {
+        load_history_file(command.args.strarg);
+    } else {
+        char sendbuf[BUFSIZE + 3];
+        sendbuf[0] = 'P';
+        sendbuf[1] = 'N';
+        sendbuf[2] = 'T';
+        strcpy(sendbuf + 3, input);
+        send(v_arg->sockfd, sendbuf, 3 + strlen(input) + 1, 0);
+    }
 }
 
 void *videotalk(void *arg) {
     v_arg = arg;
-    pthread_t threadid1;
-    pthread_create(&threadid1, NULL, video_recv, NULL);
-    pthread_t threadid2;
-    pthread_create(&threadid2, NULL, paint_input_recv, NULL);
+    init_canvas();
+
+    pthread_t threadid;
+    pthread_create(&threadid, NULL, video_recv, NULL);
+
     video_send();
     return NULL;
 }
