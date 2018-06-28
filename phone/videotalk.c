@@ -19,8 +19,8 @@
 
 #include "forceio.h"
 #include "paint.h"
-#include "videotalk.h"
 #include "ttyio.h"
+#include "videotalk.h"
 
 #define BUFSIZE 1000
 
@@ -411,8 +411,7 @@ static void send_prompt(int count) {
     sendbuf[0] = 'P';
     sendbuf[1] = 'N';
     sendbuf[2] = 'C';
-    snprintf(sendbuf + 3, sizeof(sendbuf) - 3, "\033[2K\033[1G%3d > ",
-             count + 1);
+    snprintf(sendbuf + 3, sizeof(sendbuf) - 3, "\033[2K\033[1G%3d > ", count);
     send(v_arg->sockfd, sendbuf, strlen(sendbuf) + 1, 0);
 }
 
