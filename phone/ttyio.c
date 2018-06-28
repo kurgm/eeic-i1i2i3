@@ -42,8 +42,8 @@ void ttyreader(void (*handler)(const char *input)) {
     char buf[BUFSIZE];
 
     while (1) {
-        fgets(buf, BUFSIZE, tty_in);
-        handler(buf);
+        char *ret = fgets(buf, BUFSIZE, tty_in);
+        handler(ret);
     }
 }
 
