@@ -1,0 +1,30 @@
+setcolor 255 212 170
+ovalfill 80 25 38 19
+setcolor 0 0 0
+oval 80 25 38 19
+setcolor 255 76 26
+ovalfill 80 27 14 7
+setcolor 0 0 0
+oval 80 27 14 7
+setcolor 255 128 24
+ovalfill 56 28 12 6
+ovalfill 104 28 12 6
+setcolor 0 0 0
+oval 56 28 12 6
+oval 104 28 12 6
+ovalfill 68 17 6 3
+ovalfill 92 17 6 3
+setcolor 255 255 255
+rectfill 80 23 4 2
+rectfill 98 25 4 2
+rectfill 58 25 4 2
+setcolor 0 0 0
+line 64 10 56 14
+line 64 10 68 10
+line 68 10 74 13
+line 90 10 84 13
+line 90 10 94 10
+line 94 10 102 14
+line 72 37 64 35
+line 88 37 96 35
+line 72 37 88 37

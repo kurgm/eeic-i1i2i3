@@ -1,0 +1,8 @@
+setcolor 0 0 180
+oval 80 30 60 30
+line 80 0 80 5 
+line 20 30 30 30
+line 140 30 130 30
+line 80 60 80 55
+line 80 27 80 33
+line 74 30 86 30
