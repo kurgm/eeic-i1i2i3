@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 usage_exit() {
-  echo "usage: $0 [-p AUDIOPORT] [-q VIDEOPORT] [-u VIDEOPIPE1] [-u VIDEOPIPE2] {-l | ADDRESS}" 1>&2
+  echo "usage: $0 [-p AUDIOPORT] [-q VIDEOPORT] [-u VIDEOPIPE1] [-v VIDEOPIPE2] {-l | ADDRESS}" 1>&2
   exit 1
 }
 
